@@ -25,7 +25,7 @@
     event: { label: "impegno", coll: "events", fields: [["title", "Titolo", "text", 1], ["date", "Giorno", "date", 1], ["start", "Inizio", "time"], ["end", "Fine", "time"], ["area", "Area", "area"], ["note", "Luogo o nota", "text"]] },
     post: { label: "post", coll: "posts", fields: [["title", "Titolo", "text", 1], ["area", "Area", "area"], ["channel", "Canale", "text"], ["lang", "Lingua", "lang"], ["when", "Data prevista", "date"], ["status", "Stato", "status"], ["body", "Testo", "ta"], ["note", "Nota", "tas"]] }
   };
-  var S = { gcal: null, gsync: { busy: false, err: "", calendars: null }, brief: null, tasks: [], posts: [], events: [], blocks: [], notes: [], spese: [], fit: [], posta: [], postaState: null, colors: {}, filter: "tutto", open: {}, weekStart: null, evIndex: {}, edit: null, delArmed: false, ready: false };
+  var S = { gcal: null, gsync: { busy: false, err: "", calendars: null }, brief: null, tasks: [], posts: [], events: [], blocks: [], notes: [], spese: [], fit: [], posta: [], postaState: null, contatti: [], liWeek: 0, colors: {}, filter: "tutto", open: {}, weekStart: null, evIndex: {}, edit: null, delArmed: false, ready: false };
   try { var f0 = localStorage.getItem("cf-filter"); if (f0 && (f0 === "tutto" || AREAS[f0])) S.filter = f0; } catch (e) {}
 
   function $(id) { return document.getElementById(id); }
@@ -248,7 +248,7 @@
       var d = x.date ? new Date(x.date) : null, when = d && !isNaN(d) ? cap(dayLabel(keyOf(d), false)) + ", " + hhmm(d.toISOString()) : "";
       var pr = rank[x.priority] != null ? x.priority : "bassa";
       return '<div class="pm"><div class="row-meta"><span class="prio ' + esc(pr) + '">' + esc(pr) + "</span>" + areaTag(x.area) + (x.account ? '<span class="tag acct">' + esc(x.account) + "</span>" : "") +
-        (x.needsReply === true ? '<span class="tag reply">Da rispondere</span>' : "") + (when ? '<span class="sub">' + esc(when) + "</span>" : "") + "</div><strong>" + esc(x.subject) + '</strong><span class="from">' + esc(x.from) + "</span>" + (x.summary ? "<p>" + esc(x.summary) + "</p>" : "") + "</div>";
+        (x.needsReply === true ? '<span class="tag reply">Da rispondere</span>' : "") + (when ? '<span class="sub">' + esc(when) + "</span>" : "") + "</div><strong>" + esc(x.subject) + '</strong><span class="from">' + esc(x.from) + "</span>" + (x.summary ? "<p>" + esc(x.summary) + "</p>" : "") + (x.draft ? '<div class="draft">' + esc(x.draft) + '</div><div class="post-actions"><button type="button" class="btn primary" data-copydraft="' + esc(x.id) + '">Copia la risposta</button>' + (safeUrl(x.draftUrl) ? '<a class="btn" href="' + esc(x.draftUrl) + '" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;text-decoration:none;color:inherit">Apri in Gmail</a>' : "") + "</div>" : "") + "</div>";
     }).join("");
   }
 
@@ -383,7 +383,7 @@
     if (d.getAttribute("data-armed") !== "1") { d.setAttribute("data-armed", "1"); d.textContent = "Conferma"; setTimeout(function () { d.setAttribute("data-armed", "0"); d.textContent = "Elimina"; }, 3000); return; }
     DB.del(p[0], p[1]).catch(fail);
   });
-  function renderAll() { renderMoney(); renderFit(); badges(); renderToday(); renderStats(); renderHead(); renderBrief(); renderCal(); renderMail(); renderPosta(); renderBlocks(); renderTasks(); renderPosts(); renderAreas(); renderNotes(); }
+  function renderAll() { renderMoney(); renderFit(); badges(); renderToday(); renderStats(); renderHead(); renderBrief(); renderCal(); renderMail(); renderPosta(); renderBlocks(); renderTasks(); renderPosts(); renderAreas(); renderNotes(); renderExtra(); }
 
   /* ---------- colori ---------- */
   function buildColors() {
@@ -515,7 +515,7 @@
   document.addEventListener("toggle", function (e) { var d = e.target; if (d && d.getAttribute && d.getAttribute("data-post")) S.open[d.getAttribute("data-post")] = d.open; }, true);
   document.addEventListener("change", function (e) {
     var t = e.target, id = t && t.getAttribute && t.getAttribute("data-task");
-    if (id) { DB.update("tasks", id, { done: t.checked }).catch(function () { renderTasks(); fail(); }); return; }
+    if (id) { DB.update("tasks", id, { done: t.checked, doneAt: t.checked ? new Date().toISOString() : null }).catch(function () { renderTasks(); fail(); }); return; }
     var k = t && t.getAttribute && t.getAttribute("data-col");
     if (k) { var c = Object.assign({}, S.colors); c[k] = t.value; S.colors = c; DB.set("settings", "colors", c).catch(fail); }
   });
@@ -674,19 +674,154 @@
     S.ready = true;
     timer = setTimeout(function () { $("note").textContent = "I dati non sono ancora arrivati. Se compaiono, potrebbero non essere aggiornati."; $("note").hidden = false; }, 10000);
     DB.watch("brief", function () { var b = coll("brief").get("latest"); S.brief = b || null; renderAll(); });
-    DB.watch("tasks", function () { S.tasks = snapList("tasks"); renderTasks(); renderStats(); });
-    DB.watch("posts", function () { S.posts = snapList("posts"); renderPosts(); });
+    DB.watch("tasks", function () { S.tasks = snapList("tasks"); renderTasks(); renderStats(); renderExtra(); });
+    DB.watch("posts", function () { S.posts = snapList("posts"); renderPosts(); renderExtra(); });
     DB.watch("events", function () { S.events = snapList("events"); renderCal(); renderStats(); });
     DB.watch("blocks", function () { S.blocks = snapList("blocks"); renderBlocks(); renderCal(); renderStats(); });
-    DB.watch("spese", function () { S.spese = snapList("spese"); renderMoney(); });
-    DB.watch("allenamenti", function () { S.fit = snapList("allenamenti"); renderFit(); });
+    DB.watch("spese", function () { S.spese = snapList("spese"); renderMoney(); renderExtra(); });
+    DB.watch("allenamenti", function () { S.fit = snapList("allenamenti"); renderFit(); renderExtra(); });
+    DB.watch("contatti", function () { S.contatti = snapList("contatti"); renderRec(); renderSearchIf(); });
     DB.watch("notes", function () { S.notes = snapList("notes"); renderNotes(); });
     DB.watch("posta", function () { S.postaState = coll("posta").has("_stato") ? coll("posta").get("_stato") : null; S.posta = snapList("posta"); renderPosta(); });
-    DB.watch("gcal", function () { S.gcal = coll("gcal").get("feed") || null; renderCal(); renderStats(); });
+    DB.watch("gcal", function () { S.gcal = coll("gcal").get("feed") || null; renderCal(); renderStats(); renderExtra(); });
     callSync("status").then(function (j) { S.gsync.calendars = j.calendars; renderCalStatus(); if (j.calendars) syncCalendar(true); }).catch(function () {});
     DB.watch("settings", function () { S.colors = Object.assign({}, coll("settings").get("colors") || {}); applyColors(); });
     if (pushSupported()) refreshPushBtn();
   }
+
+  /* ---------- funzioni v8: scuola, scadenze Maunsell, calendario LinkedIn, recruiting, riepilogo, ricerca, copia dati ---------- */
+  var REC_ST = ["Da contattare", "Contattata", "Ha risposto", "Da richiamare", "Rifiutata"];
+  function renderSchool() {
+    var key = todayKey(), tom = addDays(key, 1);
+    var evs = eventsFor(key, tom).filter(function (e) { return e.area === "scuola"; });
+    $("c-school").textContent = evs.length ? evs.length + (evs.length === 1 ? " voce" : " voci") : "";
+    $("school").innerHTML = evs.length ? evs.map(function (e) {
+      var w = e.date === key ? "Oggi" : "Domani", t = e.start ? e.start + (e.end ? "–" + e.end : "") : "Tutto il giorno";
+      return "<li><span>" + w + "</span><span><b>" + esc(t) + "</b> · " + esc(e.title) + (e.note ? ' <span class="sub">' + esc(e.note) + "</span>" : "") + "</span></li>";
+    }).join("") : '<li><span></span><span class="empty">Nessuna lezione in calendario per oggi e domani.</span></li>';
+  }
+  function renderMz() {
+    var list = S.tasks.filter(function (t) { return !t.done && t.reminder === true && t.due; }).sort(function (a, b) { return a.due.localeCompare(b.due); });
+    $("c-mz").textContent = list.length ? list.length + (list.length === 1 ? " scadenza" : " scadenze") : "";
+    $("mz-list").innerHTML = list.length ? list.map(function (t) {
+      return "<li><span>" + esc(dayLabel(t.due, false)) + "</span><span>" + esc(t.title) + '</span><b></b><button type="button" class="lnk" data-delrow="tasks|' + esc(t.id) + '" aria-label="Elimina">Elimina</button></li>';
+    }).join("") : '<li><span></span><span class="empty">Nessuna scadenza con promemoria.</span></li>';
+  }
+  function renderLiCal() {
+    var key = todayKey(), start = addDays(weekMonday(key), S.liWeek * 7), i, html = "";
+    $("c-lical").textContent = "Settimana " + isoWeek(start);
+    var pub = S.posts.filter(function (p) { return validDate(p.when); });
+    for (i = 0; i < 7; i++) {
+      var d = addDays(start, i), ps = pub.filter(function (p) { return p.when === d && show(p.area); });
+      html += '<div class="licday' + (d === key ? " today" : "") + (ps.length ? "" : " empty") + '"><h4>' + esc(dayLabel(d, false).replace(/\s\w+\.?$/, "")) + "</h4>" +
+        ps.map(function (p) { return '<span class="p ' + esc(p.status || "bozza") + '">' + esc(p.title || "Post") + "</span>"; }).join("") + (ps.length ? "" : "<em>libero</em>") + "</div>";
+    }
+    $("lical").innerHTML = html;
+  }
+  function renderRec() {
+    var list = S.contatti.slice().sort(function (a, b) { return REC_ST.indexOf(a.status) - REC_ST.indexOf(b.status) || String(b.createdAt || "").localeCompare(String(a.createdAt || "")); });
+    var cnt = {}; list.forEach(function (x) { cnt[x.status] = (cnt[x.status] || 0) + 1; });
+    $("c-rec").textContent = list.length ? list.length + " scuole" : "";
+    $("rec-sum").innerHTML = REC_ST.filter(function (k) { return cnt[k]; }).map(function (k) { return "<span>" + esc(k) + ": " + cnt[k] + "</span>"; }).join("");
+    $("rec-list").innerHTML = list.length ? list.map(function (x) {
+      return "<li><span><b>" + esc(x.school) + "</b>" + (x.name ? " · " + esc(x.name) : "") + '</span><button type="button" class="st" data-rec="' + esc(x.id) + '">' + esc(x.status || REC_ST[0]) + '</button><button type="button" class="lnk" data-delrow="contatti|' + esc(x.id) + '" aria-label="Elimina">Elimina</button></li>';
+    }).join("") : '<li><span class="empty">Aggiungi le scuole che contatti. Tocca lo stato per farlo avanzare.</span></li>';
+  }
+  function weekStats() {
+    var key = todayKey(), a = weekMonday(key), b = addDays(a, 6);
+    var inW = function (d) { return validDate(d) && d >= a && d <= b; };
+    var sp = S.spese.filter(function (x) { return inW(x.date); }).reduce(function (s, x) { return s + (Number(x.amount) || 0); }, 0);
+    var fit = S.fit.filter(function (x) { return inW(x.date); }), min = fit.reduce(function (s, x) { return s + (Number(x.minutes) || 0); }, 0), km = fit.reduce(function (s, x) { return s + (Number(x.km) || 0); }, 0);
+    var pubd = S.posts.filter(function (p) { return p.status === "pubblicato" && inW(p.when); }).length;
+    var drafts = S.posts.filter(function (p) { return p.status === "bozza"; }).length;
+    var open = S.tasks.filter(function (t) { return !t.done; }), late = open.filter(function (t) { return t.due && t.due < key; }).length;
+    var doneW = S.tasks.filter(function (t) { return t.done && t.doneAt && inW(String(t.doneAt).slice(0, 10)); }).length;
+    var next = S.tasks.filter(function (t) { return !t.done && t.due && t.due > b && t.due <= addDays(b, 7); }).length;
+    var rec = S.contatti.filter(function (x) { return x.status === "Contattata" || x.status === "Da richiamare"; }).length;
+    var rows = [
+      ["Compiti", doneW + " completati, " + open.length + " aperti" + (late ? ", " + late + " in ritardo" : "")],
+      ["Prossima settimana", next + (next === 1 ? " scadenza" : " scadenze")],
+      ["LinkedIn", pubd + " pubblicati, " + drafts + " bozze pronte"],
+      ["Spese", eur(sp)],
+      ["Allenamenti", fit.length + " sessioni, " + min + " min" + (km ? ", " + (Math.round(km * 10) / 10) + " km" : "")],
+      ["Recruiting", rec + " scuole da seguire"]
+    ];
+    return { rows: rows, week: isoWeek(a) };
+  }
+  function renderWk() {
+    var w = weekStats();
+    $("c-wk").textContent = "Settimana " + w.week;
+    $("wk-list").innerHTML = w.rows.map(function (r) { return "<li><span></span><span>" + esc(r[0]) + "</span><b>" + esc(r[1]) + "</b><span></span></li>"; }).join("");
+    var o = romeParts(), dow = new Date(Date.UTC(+o.year, +o.month - 1, +o.day)).getUTCDay();
+    $("wk-nudge").hidden = !((dow === 5 && +o.hour >= 17) || dow === 6 || dow === 0);
+  }
+  function renderExtra() { renderSchool(); renderMz(); renderLiCal(); renderRec(); renderWk(); }
+
+  /* ricerca */
+  function searchAll(q) {
+    q = q.toLowerCase(); var out = [];
+    var has = function () { var i; for (i = 0; i < arguments.length; i++) if (String(arguments[i] || "").toLowerCase().indexOf(q) >= 0) return true; return false; };
+    S.tasks.forEach(function (t) { if (has(t.title)) out.push(["Compito", t.title + (t.due ? " · " + dayLabel(t.due, false) : "") + (t.done ? " (fatto)" : ""), "compiti"]); });
+    S.notes.forEach(function (n) { if (has(n.text)) out.push(["Appunto", n.text, "oggi"]); });
+    S.posta.forEach(function (m) { if (m.id !== "_stato" && has(m.subject, m.from, m.summary)) out.push(["Mail", m.subject + " · " + (m.from || ""), "posta"]); });
+    S.posts.forEach(function (p) { if (has(p.title, p.body)) out.push(["Post", p.title || "Post", "linkedin"]); });
+    S.spese.forEach(function (x) { if (has(x.note, x.category)) out.push(["Spesa", eur(Number(x.amount) || 0) + " · " + (x.category || "") + (x.note ? " · " + x.note : ""), "aree"]); });
+    S.fit.forEach(function (x) { if (has(x.note, x.sport)) out.push(["Allenamento", (x.sport || "") + " · " + x.minutes + " min", "aree"]); });
+    S.contatti.forEach(function (x) { if (has(x.school, x.name)) out.push(["Scuola", x.school + (x.name ? " · " + x.name : ""), "aree"]); });
+    eventsFor("2000-01-01", "2100-01-01").forEach(function (e) { if (has(e.title, e.note)) out.push(["Impegno", dayLabel(e.date, false) + " · " + e.title, "agenda"]); });
+    return out.slice(0, 25);
+  }
+  function renderSearch() {
+    var q = $("q").value.trim(), r = $("q-res");
+    if (q.length < 2) { r.hidden = true; r.innerHTML = ""; return; }
+    var res = searchAll(q);
+    r.hidden = false;
+    r.innerHTML = res.length ? res.map(function (x) { return '<li data-go="' + x[2] + '"><b>' + esc(x[0]) + "</b><span>" + esc(x[1]) + "</span></li>"; }).join("") : '<li><b></b><span class="empty">Nessun risultato.</span></li>';
+  }
+  function renderSearchIf() { if ($("q") && $("q").value.trim().length >= 2) renderSearch(); }
+  $("q").addEventListener("input", renderSearch);
+
+  /* azioni */
+  $("lw-prev").addEventListener("click", function () { S.liWeek--; renderLiCal(); });
+  $("lw-next").addEventListener("click", function () { S.liWeek++; renderLiCal(); });
+  $("mz-date").value = addDays(todayKey(), 1);
+  $("mz-form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var t = $("mz-title").value.trim(), d = $("mz-date").value;
+    if (!t || !validDate(d)) return;
+    DB.add("tasks", { title: t, area: "maunsell", due: d, done: false, source: "tu", reminder: true, createdAt: new Date().toISOString() }).then(function () { toast("Scadenza salvata."); }).catch(fail);
+    $("mz-title").value = "";
+  });
+  $("rec-form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var sc = $("rec-school").value.trim();
+    if (!sc) return;
+    DB.add("contatti", { school: sc, name: $("rec-name").value.trim(), status: REC_ST[0], createdAt: new Date().toISOString() }).catch(fail);
+    $("rec-school").value = ""; $("rec-name").value = "";
+  });
+  document.addEventListener("click", function (e) {
+    var r = e.target.closest && e.target.closest("[data-rec]");
+    if (r) { var id = r.getAttribute("data-rec"), c = coll("contatti").get(id) || {}; DB.update("contatti", id, { status: REC_ST[(REC_ST.indexOf(c.status) + 1) % REC_ST.length], updatedAt: new Date().toISOString() }).catch(fail); return; }
+    var cd = e.target.closest && e.target.closest("[data-copydraft]");
+    if (cd) { var m = coll("posta").get(cd.getAttribute("data-copydraft")) || {}; copyText(m.draft || "", "Risposta copiata."); }
+  });
+  function copyText(t, msg) {
+    var done = function () { toast(msg); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(done, function () { toast("Non sono riuscito a copiare."); });
+    else toast("Non sono riuscito a copiare.");
+  }
+  $("wk-copy").addEventListener("click", function () { var w = weekStats(); copyText("Riepilogo settimana " + w.week + "\n" + w.rows.map(function (r) { return r[0] + ": " + r[1]; }).join("\n"), "Riepilogo copiato."); });
+  $("bk-go").addEventListener("click", async function () {
+    try {
+      var all = [], from = 0, r;
+      do { r = await sb.from("docs").select("collection,id,data,updated_at").range(from, from + 999); if (r.error) throw r.error; all = all.concat(r.data || []); from += 1000; } while (r.data && r.data.length === 1000);
+      all = all.filter(function (x) { return x.collection.charAt(0) !== "_"; });
+      var blob = new Blob([JSON.stringify({ esportato: new Date().toISOString(), documenti: all }, null, 1)], { type: "application/json" });
+      var a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "cruscotto-copia-" + todayKey() + ".json";
+      document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 5000);
+      toast("Copia scaricata (" + all.length + " elementi).");
+    } catch (er) { toast("Non sono riuscito a scaricare la copia."); }
+  });
   S.weekStart = weekMonday(todayKey());
   buildChips(); buildColors(); renderAll();
   setInterval(renderHead, 60000);

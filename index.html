@@ -228,6 +228,12 @@
   <div class="note" id="note" hidden></div>
   <nav class="chips" id="chips" aria-label="Filtra per area"></nav>
 
+  <section class="card search" data-tab="oggi" aria-label="Cerca">
+    <input type="search" id="q" placeholder="Cerca tra compiti, appunti, mail, post, spese…" aria-label="Cerca" autocomplete="off">
+    <ul class="q-res" id="q-res" hidden></ul>
+  </section>
+  <button type="button" class="wk-nudge" id="wk-nudge" data-go="aree" data-tab="oggi" hidden>Il riepilogo della settimana è pronto</button>
+
   <section class="card today" data-tab="oggi" aria-labelledby="h-today">
     <svg class="wm" viewBox="0 0 200 280" aria-hidden="true"><use href="#cob"/></svg>
     <header><h2 id="h-today">Oggi</h2><span class="count" id="c-today"></span></header>
@@ -237,6 +243,11 @@
       <div><h3>Da fare entro domani</h3><ul class="t-list" id="t-tasks"></ul></div>
       <div><h3>Email da rispondere</h3><ul class="t-list" id="t-mail"></ul></div>
     </div>
+  </section>
+
+  <section class="card school" data-tab="oggi" aria-labelledby="h-school">
+    <header><h2 id="h-school">Scuola</h2><span class="count" id="c-school"></span></header>
+    <ul class="t-list" id="school"></ul>
   </section>
 
   <section class="card voice" data-tab="oggi" aria-labelledby="h-voice">
@@ -297,6 +308,16 @@
         <button class="btn primary" type="submit">Aggiungi</button>
       </form>
     </section>
+    <section class="card mz" data-tab="compiti" aria-labelledby="h-mz">
+      <header><h2 id="h-mz">Scadenze Maunsell</h2><span class="count" id="c-mz"></span></header>
+      <form class="qform" id="mz-form">
+        <input type="text" id="mz-title" placeholder="Es. Preventivo Felician" aria-label="Scadenza" required>
+        <input type="date" id="mz-date" aria-label="Data" required>
+        <button type="submit" class="btn primary">Aggiungi</button>
+      </form>
+      <p class="sub">Ricevi una notifica alle 18:00 del giorno prima e un'altra alle 08:00 il giorno stesso.</p>
+      <ul class="rows" id="mz-list"></ul>
+    </section>
     <section class="card" data-tab="posta" aria-labelledby="h-mail">
       <header><h2 id="h-mail">Email da gestire</h2><span class="count" id="c-mail"></span></header>
       <div id="mail"></div>
@@ -309,12 +330,40 @@
     <div class="pm-list" id="posta"></div>
   </section>
 
+  <section class="card lical" data-tab="linkedin" aria-labelledby="h-lical">
+    <header><h2 id="h-lical">Calendario dei post</h2><div class="head-r"><button type="button" class="btn" id="lw-prev" aria-label="Settimana precedente">‹</button><span class="count" id="c-lical"></span><button type="button" class="btn" id="lw-next" aria-label="Settimana successiva">›</button></div></header>
+    <div class="licgrid" id="lical"></div>
+  </section>
+
   <section class="card" data-tab="linkedin" aria-labelledby="h-li">
     <header>
       <h2 id="h-li">LinkedIn · piano e bozze</h2>
       <div class="head-r"><span class="count" id="c-li"></span><button type="button" class="btn primary" data-new="post">Nuovo post</button></div>
     </header>
     <div class="posts" id="posts"></div>
+  </section>
+
+  <section class="card wk" data-tab="aree" aria-labelledby="h-wk">
+    <header><h2 id="h-wk">Riepilogo della settimana</h2><span class="count" id="c-wk"></span></header>
+    <ul class="rows" id="wk-list"></ul>
+    <div class="voice-actions"><button type="button" class="btn" id="wk-copy">Copia il riepilogo</button></div>
+  </section>
+
+  <section class="card rec" data-tab="aree" aria-labelledby="h-rec">
+    <header><h2 id="h-rec">Recruiting docenti</h2><span class="count" id="c-rec"></span></header>
+    <form class="qform" id="rec-form">
+      <input type="text" id="rec-school" placeholder="Scuola" aria-label="Scuola" required>
+      <input type="text" id="rec-name" placeholder="Referente (facoltativo)" aria-label="Referente">
+      <button type="submit" class="btn primary">Aggiungi</button>
+    </form>
+    <div class="rec-sum" id="rec-sum"></div>
+    <ul class="rows rec-rows" id="rec-list"></ul>
+  </section>
+
+  <section class="card" data-tab="aree" aria-labelledby="h-bk">
+    <header><h2 id="h-bk">Copia dei dati</h2></header>
+    <p class="sub">Scarica in un file tutto quello che c'è nell'app: compiti, appunti, post, spese, allenamenti, contatti e mail.</p>
+    <div class="voice-actions"><button type="button" class="btn primary" id="bk-go">Scarica la copia</button></div>
   </section>
 
   <section class="card money" data-tab="aree" aria-labelledby="h-money">
