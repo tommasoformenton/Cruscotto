@@ -1,5 +1,5 @@
 const CACHE = "cruscotto-v1";
-const SHELL = ["./", "index.html", "style.css", "app.js", "config.js", "vendor/supabase.js", "manifest.webmanifest", "icons/icon-192.png"];
+const SHELL = ["./", "index.html", "style.css", "app.js", "config.js", "supabase.js", "manifest.webmanifest", "icon-192.png"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
@@ -33,8 +33,8 @@ self.addEventListener("push", (e) => {
     self.registration.showNotification(d.title || "Cruscotto", {
       body: d.body || "",
       tag: d.tag || "cruscotto",
-      icon: "icons/icon-192.png",
-      badge: "icons/icon-192.png",
+      icon: "icon-192.png",
+      badge: "icon-192.png",
       data: { url: d.url || "./" }
     })
   );
