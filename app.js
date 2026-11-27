@@ -2,6 +2,17 @@
   "use strict";
   var CFG = window.CRUSCOTTO;
   var sb = window.supabase.createClient(CFG.url, CFG.anon, { auth: { persistSession: true, autoRefreshToken: true } });
+  // Sessione sempre attiva: copia di riserva in IndexedDB, ripristino automatico, rinnovo al rientro nell'app.
+  var KEEP = (function () {
+    function open() { return new Promise(function (ok, ko) { var r = indexedDB.open("cruscotto-keep", 1); r.onupgradeneeded = function () { r.result.createObjectStore("k"); }; r.onsuccess = function () { ok(r.result); }; r.onerror = function () { ko(r.error); }; }); }
+    function run(mode, fn) { return open().then(function (db) { return new Promise(function (ok, ko) { var t = db.transaction("k", mode), q = fn(t.objectStore("k")); t.oncomplete = function () { ok(q && q.result); }; t.onerror = function () { ko(t.error); }; }); }); }
+    return {
+      save: function (s) { return run("readwrite", function (o) { return o.put({ a: s.access_token, r: s.refresh_token }, "s"); }).catch(function () {}); },
+      load: function () { return run("readonly", function (o) { return o.get("s"); }).catch(function () { return null; }); },
+      clear: function () { return run("readwrite", function (o) { return o.delete("s"); }).catch(function () {}); }
+    };
+  })();
+  try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {}
   var TZ = "Europe/Rome";
   var AREAS = { maunsell: "Maunsell", medoacus: "Medoacus", linkedin: "LinkedIn", scuola: "Scuola", vita: "Vita" };
   var DEFAULTS = { maunsell: "#2F6FB5", medoacus: "#B8344A", linkedin: "#0E8C8C", scuola: "#7B5EA7", vita: "#D9822B" };
@@ -681,5 +692,20 @@
   setInterval(renderHead, 60000);
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(function () {});
   document.body.classList.add("has-tabs"); (function () { var t = tabFromHash(); setTab(t[0], t[1]); })();
-  sb.auth.getSession().then(function (r) { if (r.data && r.data.session) start(); else showAuth(); });
+  var started = false;
+  function go() { if (!started) { started = true; start(); } }
+  sb.auth.onAuthStateChange(function (ev, sess) {
+    if (sess && sess.refresh_token) KEEP.save(sess);
+    if (ev === "SIGNED_OUT") KEEP.clear();
+  });
+  document.addEventListener("visibilitychange", function () { if (!document.hidden) sb.auth.getSession(); });
+  sb.auth.getSession().then(async function (r) {
+    if (r.data && r.data.session) { KEEP.save(r.data.session); return go(); }
+    var k = await KEEP.load();
+    if (k && k.r) {
+      var x = await sb.auth.setSession({ access_token: k.a || "", refresh_token: k.r }).catch(function () { return {}; });
+      if (x && x.data && x.data.session) return go();
+    }
+    showAuth();
+  });
 })();
