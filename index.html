@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Cruscotto Formenton</title>
+<meta name="theme-color" content="#0B3F46">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Cruscotto">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<main class="auth" id="auth" hidden>
+  <div class="auth-card">
+    <h1>Cruscotto</h1>
+    <form id="loginform">
+      <input type="email" id="login-email" autocomplete="username" aria-label="Email" required>
+      <input type="password" id="login-pass" autocomplete="current-password" placeholder="Password" aria-label="Password" required>
+      <button class="btn primary" type="submit">Accedi</button>
+    </form>
+    <details id="setup">
+      <summary>Prima configurazione</summary>
+      <form id="setupform">
+        <input type="text" id="setup-code" placeholder="Codice di configurazione" autocomplete="off" aria-label="Codice" required>
+        <input type="password" id="setup-pass" placeholder="Scegli una password (almeno 10 caratteri)" autocomplete="new-password" minlength="10" aria-label="Nuova password" required>
+        <button class="btn" type="submit">Crea accesso</button>
+      </form>
+    </details>
+    <p class="auth-err" id="auth-err" role="alert"></p>
+  </div>
+</main>
+
+<div class="wrap" id="app" hidden>
+  <header class="top">
+    <div>
+      <p class="eyebrow" id="week">Settimana</p>
+      <h1 id="today">Cruscotto</h1>
+      <div class="stats" aria-label="Riepilogo">
+        <div class="stat"><b id="st-ev">0</b><span>impegni in settimana</span></div>
+        <div class="stat"><b id="st-mail">0</b><span>email da gestire</span></div>
+        <div class="stat"><b id="st-task">0</b><span>compiti aperti</span></div>
+      </div>
+    </div>
+    <div class="status">
+      <span class="pill"><span class="dot" id="dot"></span><span id="upd">In attesa dei dati</span></span>
+      <span class="pill" id="next"></span>
+      <button type="button" class="pill" id="push-btn" hidden>Attiva le notifiche</button>
+      <button type="button" class="pill" id="logout">Esci</button>
+    </div>
+  </header>
+
+  <div class="note" id="note" hidden></div>
+  <nav class="chips" id="chips" aria-label="Filtra per area"></nav>
+
+  <section class="card voice" aria-labelledby="h-voice">
+    <header><h2 id="h-voice">Appunti per Claude</h2><span class="count" id="voice-state"></span></header>
+    <textarea id="voice-text" rows="3" placeholder="Impegni, scadenze, compiti, idee per post. Claude li legge al prossimo aggiornamento." aria-label="Appunto"></textarea>
+    <div class="voice-actions">
+      <button type="button" class="btn" id="voice-mic" aria-pressed="false" hidden>Parla</button>
+      <button type="button" class="btn primary" id="voice-go">Invia a Claude</button>
+      <button type="button" class="lnk" id="voice-clear">Svuota</button>
+    </div>
+    <ul class="notes" id="notes"></ul>
+  </section>
+
+  <section class="card hero" aria-labelledby="h-brief">
+    <div><header><h2 id="h-brief">In breve</h2></header><p class="lead" id="summary"></p></div>
+    <div><header><h2>Priorità</h2></header><ol class="prios" id="prios"></ol></div>
+  </section>
+
+  <section class="card" aria-labelledby="h-cal">
+    <header>
+      <h2 id="h-cal">Calendario</h2>
+      <div class="head-r"><span class="count" id="c-cal"></span><button type="button" class="btn primary" data-new="event">Nuovo impegno</button></div>
+    </header>
+    <div class="cal-nav">
+      <button type="button" class="btn" data-wk="-1" aria-label="Settimana precedente">‹</button>
+      <button type="button" class="btn" data-wk="0">Questa settimana</button>
+      <button type="button" class="btn" data-wk="1" aria-label="Settimana successiva">›</button>
+      <span class="cal-range" id="cal-range"></span>
+    </div>
+    <p class="sub" id="cal-status" style="margin-top:.6rem"></p>
+    <div class="week" id="week-grid"></div>
+    <details class="cal-setup" id="cal-setup">
+      <summary>Collega Google Calendar</summary>
+      <p class="sub">In Google Calendar, sul computer: Impostazioni, scegli il calendario, poi "Indirizzo segreto in formato iCal". Incollalo qui, uno per riga se hai più calendari. L'indirizzo resta sul server e non si vede più dopo il salvataggio.</p>
+      <textarea id="ical-urls" rows="3" placeholder="https://calendar.google.com/calendar/ical/…/basic.ics" aria-label="Indirizzi iCal" autocomplete="off" spellcheck="false"></textarea>
+      <div class="dactions">
+        <button type="button" class="btn primary" id="ical-save">Salva e aggiorna</button>
+        <button type="button" class="btn" id="ical-sync">Aggiorna ora</button>
+        <button type="button" class="btn danger" id="ical-clear" hidden>Scollega</button>
+      </div>
+      <p class="auth-err" id="ical-err" role="alert"></p>
+    </details>
+  </section>
+
+  <section class="card" aria-labelledby="h-blocks">
+    <header><h2 id="h-blocks">Blocchi di lavoro proposti</h2><span class="count" id="c-blocks"></span></header>
+    <div class="blocks" id="blocks"></div>
+  </section>
+
+  <div class="grid">
+    <section class="card" aria-labelledby="h-tasks">
+      <header><h2 id="h-tasks">Compiti</h2><span class="count" id="c-tasks"></span></header>
+      <ul class="tasks" id="tasks"></ul>
+      <details class="done-list" id="donewrap" hidden><summary id="donesum"></summary><ul class="tasks" id="done"></ul></details>
+      <form class="add" id="addform">
+        <input type="text" id="newtask" placeholder="Nuovo compito" autocomplete="off" aria-label="Nuovo compito">
+        <select id="newarea" aria-label="Area del compito"></select>
+        <button class="btn primary" type="submit">Aggiungi</button>
+      </form>
+    </section>
+    <section class="card" aria-labelledby="h-mail">
+      <header><h2 id="h-mail">Email da gestire</h2><span class="count" id="c-mail"></span></header>
+      <div id="mail"></div>
+    </section>
+  </div>
+
+  <section class="card posta" id="posta-card" aria-labelledby="h-posta">
+    <header><h2 id="h-posta">Posta Thunderbird</h2><span class="count" id="c-posta"></span></header>
+    <p class="sub" id="posta-state"></p>
+    <div class="pm-list" id="posta"></div>
+  </section>
+
+  <section class="card" aria-labelledby="h-li">
+    <header>
+      <h2 id="h-li">LinkedIn · piano e bozze</h2>
+      <div class="head-r"><span class="count" id="c-li"></span><button type="button" class="btn primary" data-new="post">Nuovo post</button></div>
+    </header>
+    <div class="posts" id="posts"></div>
+  </section>
+
+  <section class="card" aria-labelledby="h-areas">
+    <header><h2 id="h-areas">Stato delle aree</h2></header>
+    <ul class="areas" id="areas"></ul>
+  </section>
+
+  <details class="card" id="colors">
+    <summary class="card-sum"><h2>Colori delle aree</h2></summary>
+    <div class="colors-wrap" id="colorrows"></div>
+    <div class="colors-foot">
+      <button type="button" class="btn" id="colreset">Ripristina i colori</button>
+      <span class="sub">La scelta resta salvata per tutte le tue schermate.</span>
+    </div>
+  </details>
+
+  <p class="runs">Aggiornamenti automatici ogni giorno alle 06:42, 14:37 e 17:44. Posta Thunderbird alle 12:00 e alle 18:00 (ora di Roma).</p>
+</div>
+
+<dialog id="dlg" aria-labelledby="dlg-title">
+  <form id="dform">
+    <h2 id="dlg-title"></h2>
+    <div id="dfields"></div>
+    <div class="dactions">
+      <button type="button" class="btn danger" id="ddel" hidden>Elimina</button>
+      <span class="grow"></span>
+      <button type="button" class="btn" id="dcancel">Chiudi</button>
+      <button type="submit" class="btn primary" id="dsave">Salva</button>
+    </div>
+  </form>
+</dialog>
+<div id="toast" role="status" aria-live="polite" hidden></div>
+
+<script src="vendor/supabase.js"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
