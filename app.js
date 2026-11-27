@@ -14,7 +14,7 @@
     event: { label: "impegno", coll: "events", fields: [["title", "Titolo", "text", 1], ["date", "Giorno", "date", 1], ["start", "Inizio", "time"], ["end", "Fine", "time"], ["area", "Area", "area"], ["note", "Luogo o nota", "text"]] },
     post: { label: "post", coll: "posts", fields: [["title", "Titolo", "text", 1], ["area", "Area", "area"], ["channel", "Canale", "text"], ["lang", "Lingua", "lang"], ["when", "Data prevista", "date"], ["status", "Stato", "status"], ["body", "Testo", "ta"], ["note", "Nota", "tas"]] }
   };
-  var S = { gcal: null, gsync: { busy: false, err: "", calendars: null }, brief: null, tasks: [], posts: [], events: [], blocks: [], notes: [], posta: [], postaState: null, colors: {}, filter: "tutto", open: {}, weekStart: null, evIndex: {}, edit: null, delArmed: false, ready: false };
+  var S = { gcal: null, gsync: { busy: false, err: "", calendars: null }, brief: null, tasks: [], posts: [], events: [], blocks: [], notes: [], spese: [], fit: [], posta: [], postaState: null, colors: {}, filter: "tutto", open: {}, weekStart: null, evIndex: {}, edit: null, delArmed: false, ready: false };
   try { var f0 = localStorage.getItem("cf-filter"); if (f0 && (f0 === "tutto" || AREAS[f0])) S.filter = f0; } catch (e) {}
 
   function $(id) { return document.getElementById(id); }
@@ -103,8 +103,9 @@
     if (/LinkedIn/i.test(s)) return "linkedin";
     return "vita";
   }
-  function eventsForWeek() {
-    var days = weekDays(), from = days[0], to = days[6], list = [];
+  function eventsForWeek() { var days = weekDays(); return eventsFor(days[0], days[6]); }
+  function eventsFor(from, to) {
+    var list = [];
     if (S.gcal && Array.isArray(S.gcal.events)) {
       S.gcal.events.forEach(function (e) {
         list.push({ id: e.id, src: "gcal", title: e.title, date: e.date, start: e.start || "", end: e.end || "", note: e.note || "", area: guessArea(e.title, e.note) });
@@ -190,6 +191,7 @@
       '<button type="button" class="lnk" data-edit="task|' + esc(t.id) + '">Modifica</button></li>';
   }
   function renderTasks() {
+    badges();
     var all = S.tasks.filter(function (t) { return show(t.area); });
     var open = all.filter(function (t) { return !t.done; }), done = all.filter(function (t) { return t.done; });
     open.sort(function (a, b) { return String(a.due || "9999").localeCompare(String(b.due || "9999")) || String(a.createdAt || "").localeCompare(String(b.createdAt || "")); });
@@ -221,6 +223,7 @@
     $("areas").innerHTML = keys.length ? keys.map(function (k) { return "<li><div>" + areaTag(k) + "</div><p>" + esc(a[k]) + "</p></li>"; }).join("") : '<li><p class="empty">Lo stato di ogni area compare dopo il primo aggiornamento.</p></li>';
   }
   function renderPosta() {
+    badges();
     var rank = { alta: 0, media: 1, bassa: 2 };
     var list = S.posta.filter(function (x) { return x.id !== "_stato" && show(x.area); });
     list.sort(function (a, b) { return String(b.date || "").localeCompare(String(a.date || "")); });
@@ -236,6 +239,34 @@
       return '<div class="pm"><div class="row-meta"><span class="prio ' + esc(pr) + '">' + esc(pr) + "</span>" + areaTag(x.area) + (x.account ? '<span class="tag acct">' + esc(x.account) + "</span>" : "") +
         (x.needsReply === true ? '<span class="tag reply">Da rispondere</span>' : "") + (when ? '<span class="sub">' + esc(when) + "</span>" : "") + "</div><strong>" + esc(x.subject) + '</strong><span class="from">' + esc(x.from) + "</span>" + (x.summary ? "<p>" + esc(x.summary) + "</p>" : "") + "</div>";
     }).join("");
+  }
+
+  function renderToday() {
+    var key = todayKey(), tom = addDays(key, 1), o = romeParts(), now = o.hour + ":" + o.minute;
+    var evs = eventsFor(key, key);
+    var next = evs.filter(function (e) { return e.start && (e.end || e.start) >= now; })[0];
+    var allday = evs.filter(function (e) { return !e.start; });
+    $("c-today").textContent = evs.length ? evs.length + (evs.length === 1 ? " impegno" : " impegni") : "Giornata libera";
+    var b = S.brief;
+    $("t-summary").textContent = b && b.summary ? b.summary : "";
+    $("t-summary").hidden = !(b && b.summary);
+    var agenda = allday.concat(evs.filter(function (e) { return e.start; }));
+    $("t-agenda").innerHTML = agenda.length ? agenda.map(function (e) {
+      var past = e.start && (e.end || e.start) < now, isNext = next && e === next;
+      return '<li class="' + (past ? "past " : "") + (isNext ? "next" : "") + '" data-area="' + esc(e.area) + '"><span class="tm">' + (e.start ? esc(e.start) : "Giorno") + "</span><span>" + esc(e.title) + (isNext ? ' <em class="nx">prossimo</em>' : "") + "</span></li>";
+    }).join("") : '<li class="empty">Nessun impegno in calendario oggi.</li>';
+    var due = S.tasks.filter(function (t) { return !t.done && t.due && t.due <= tom && show(t.area); });
+    due.sort(function (a, c) { return String(a.due).localeCompare(String(c.due)); });
+    $("t-tasks").innerHTML = due.length ? due.slice(0, 5).map(function (t) {
+      var tag = t.due < key ? "in ritardo" : t.due === key ? "oggi" : "domani";
+      return '<li><span class="due ' + (t.due < key ? "late" : "") + '">' + tag + "</span><span>" + esc(t.title) + "</span></li>";
+    }).join("") + (due.length > 5 ? '<li class="more">e altri ' + (due.length - 5) + "</li>" : "") : '<li class="empty">Nessun compito in scadenza.</li>';
+    var rank = { alta: 0, media: 1 };
+    var reply = S.posta.filter(function (x) { return x.id !== "_stato" && x.needsReply === true && show(x.area); }).map(function (x) { return { s: x.subject, f: x.from, p: x.priority, k: "posta" }; });
+    ((b && b.emails) || []).filter(function (x) { return rank[x.priority] != null && show(x.area); }).forEach(function (x) { reply.push({ s: x.subject, f: x.from, p: x.priority, k: "mail" }); });
+    $("t-mail").innerHTML = reply.length ? reply.slice(0, 5).map(function (r) {
+      return '<li><a href="#' + (r.k === "posta" ? "posta-card" : "h-mail") + '"><span class="prio ' + esc(r.p || "bassa") + '">' + esc(r.p || "bassa") + "</span> " + esc(r.s) + '<small>' + esc(r.f) + "</small></a></li>";
+    }).join("") + (reply.length > 5 ? '<li class="more">e altre ' + (reply.length - 5) + "</li>" : "") : '<li class="empty">Nessuna email da rispondere.</li>';
   }
   function renderBlocks() {
     var key = todayKey();
@@ -261,7 +292,87 @@
     $("st-mail").textContent = ((S.brief && S.brief.emails) || []).filter(function (x) { return show(x.area); }).length;
     $("st-task").textContent = S.tasks.filter(function (t) { return !t.done && show(t.area); }).length;
   }
-  function renderAll() { renderStats(); renderHead(); renderBrief(); renderCal(); renderMail(); renderPosta(); renderBlocks(); renderTasks(); renderPosts(); renderAreas(); renderNotes(); }
+
+  /* ---------- schede ---------- */
+  var TABS = ["oggi", "agenda", "compiti", "posta", "linkedin", "aree"];
+  function setTab(t, scrollTo) {
+    if (TABS.indexOf(t) < 0) t = "oggi";
+    $("app").setAttribute("data-tab", t);
+    var b = document.querySelectorAll("#tabbar button"), i;
+    for (i = 0; i < b.length; i++) { if (b[i].getAttribute("data-go") === t) b[i].setAttribute("aria-current", "page"); else b[i].removeAttribute("aria-current"); }
+    try { history.replaceState(null, "", "#" + t); } catch (e) {}
+    if (scrollTo) { var el = $(scrollTo); if (el) { try { el.scrollIntoView(); } catch (e) {} } } else { window.scrollTo(0, 0); }
+  }
+  function tabFromHash() {
+    var h = (location.hash || "").slice(1);
+    if (h === "posta-card" || h === "h-mail") return ["posta", h];
+    return [TABS.indexOf(h) >= 0 ? h : "oggi", null];
+  }
+  function badges() {
+    var n = S.tasks.filter(function (t) { return !t.done && t.due && t.due <= addDays(todayKey(), 1); }).length;
+    var m = S.posta.filter(function (x) { return x.id !== "_stato" && x.needsReply === true; }).length;
+    $("bd-task").textContent = n; $("bd-task").hidden = !n;
+    $("bd-mail").textContent = m; $("bd-mail").hidden = !m;
+  }
+  document.addEventListener("click", function (e) {
+    var g = e.target.closest && e.target.closest("[data-go]");
+    if (g) { setTab(g.getAttribute("data-go")); return; }
+    var a = e.target.closest && e.target.closest('#t-mail a[href^="#"]');
+    if (a) { e.preventDefault(); setTab("posta", a.getAttribute("href").slice(1)); }
+  });
+  window.addEventListener("hashchange", function () { var t = tabFromHash(); setTab(t[0], t[1]); });
+
+  /* ---------- spese e allenamenti ---------- */
+  var CATC = { Spesa: "#3F8A4E", Casa: "#2F6FB5", Trasporti: "#7B5EA7", Lavoro: "#D9822B", Svago: "#0E8C8C", Salute: "#B8344A", Altro: "#8A8F98" };
+  function eur(n) { return n.toLocaleString("it-IT", { style: "currency", currency: "EUR" }); }
+  function renderMoney() {
+    var key = todayKey(), ym = key.slice(0, 7), prev = (function () { var p = key.split("-").map(Number), d = new Date(Date.UTC(p[0], p[1] - 2, 1)); return d.toISOString().slice(0, 7); })();
+    var all = S.spese.slice().sort(function (a, b) { return String(b.date || "").localeCompare(String(a.date || "")) || String(b.createdAt || "").localeCompare(String(a.createdAt || "")); });
+    var cur = all.filter(function (x) { return String(x.date || "").slice(0, 7) === ym; }), pv = all.filter(function (x) { return String(x.date || "").slice(0, 7) === prev; });
+    var tot = cur.reduce(function (s, x) { return s + (Number(x.amount) || 0); }, 0), ptot = pv.reduce(function (s, x) { return s + (Number(x.amount) || 0); }, 0);
+    $("c-money").textContent = "Questo mese " + eur(tot);
+    var by = {}; cur.forEach(function (x) { by[x.category || "Altro"] = (by[x.category || "Altro"] || 0) + (Number(x.amount) || 0); });
+    var cats = Object.keys(by).sort(function (a, b) { return by[b] - by[a]; });
+    $("m-bars").innerHTML = (cats.length ? cats.map(function (c) { return '<div class="bar"><span>' + esc(c) + '</span><i style="--w:' + Math.max(4, Math.round(by[c] / (by[cats[0]] || 1) * 100)) + "%;--c:" + (CATC[c] || "#8A8F98") + '"></i><b>' + eur(by[c]) + "</b></div>"; }).join("") : '<p class="empty">Nessuna spesa questo mese.</p>') +
+      (ptot ? '<p class="sub">Mese scorso: ' + eur(ptot) + ".</p>" : "");
+    $("m-list").innerHTML = all.slice(0, 8).map(function (x) {
+      return "<li><span>" + esc(dayLabel(x.date || key, false)) + "</span><span>" + esc(x.category || "") + (x.note ? " · " + esc(x.note) : "") + "</span><b>" + eur(Number(x.amount) || 0) + '</b><button type="button" class="lnk" data-delrow="spese|' + esc(x.id) + '" aria-label="Elimina">Elimina</button></li>';
+    }).join("");
+  }
+  function renderFit() {
+    var key = todayKey(), wk = weekMonday(key);
+    var all = S.fit.slice().sort(function (a, b) { return String(b.date || "").localeCompare(String(a.date || "")) || String(b.createdAt || "").localeCompare(String(a.createdAt || "")); });
+    var w = all.filter(function (x) { return x.date >= wk; });
+    var min = w.reduce(function (s, x) { return s + (Number(x.minutes) || 0); }, 0), km = w.reduce(function (s, x) { return s + (Number(x.km) || 0); }, 0);
+    $("c-fit").textContent = w.length ? w.length + (w.length === 1 ? " allenamento" : " allenamenti") + " in settimana" : "";
+    $("f-stats").innerHTML = '<div class="stat2"><b>' + w.length + "</b><span>sessioni</span></div><div class=\"stat2\"><b>" + min + '</b><span>minuti</span></div><div class="stat2"><b>' + (Math.round(km * 10) / 10).toLocaleString("it-IT") + "</b><span>km</span></div>";
+    $("f-list").innerHTML = all.slice(0, 8).map(function (x) {
+      return "<li><span>" + esc(dayLabel(x.date || key, false)) + "</span><span>" + esc(x.sport || "") + (x.note ? " · " + esc(x.note) : "") + "</span><b>" + esc(x.minutes) + " min" + (x.km ? " · " + esc(x.km) + " km" : "") + '</b><button type="button" class="lnk" data-delrow="allenamenti|' + esc(x.id) + '" aria-label="Elimina">Elimina</button></li>';
+    }).join("");
+  }
+  $("money-form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var v = Number($("m-amount").value.replace(",", "."));
+    if (!(v > 0)) return;
+    DB.add("spese", { date: todayKey(), amount: Math.round(v * 100) / 100, category: $("m-cat").value, note: $("m-note").value.trim(), createdAt: new Date().toISOString() }).then(function () { toast("Spesa salvata."); }).catch(fail);
+    $("m-amount").value = ""; $("m-note").value = "";
+  });
+  $("fit-form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var m = Number($("f-min").value);
+    if (!(m > 0)) return;
+    var k = Number($("f-km").value.replace(",", "."));
+    DB.add("allenamenti", { date: todayKey(), sport: $("f-sport").value, minutes: m, km: k > 0 ? k : null, note: $("f-note").value.trim(), createdAt: new Date().toISOString() }).then(function () { toast("Allenamento salvato."); }).catch(fail);
+    $("f-min").value = ""; $("f-km").value = ""; $("f-note").value = "";
+  });
+  document.addEventListener("click", function (e) {
+    var d = e.target.closest && e.target.closest("[data-delrow]");
+    if (!d) return;
+    var p = d.getAttribute("data-delrow").split("|");
+    if (d.getAttribute("data-armed") !== "1") { d.setAttribute("data-armed", "1"); d.textContent = "Conferma"; setTimeout(function () { d.setAttribute("data-armed", "0"); d.textContent = "Elimina"; }, 3000); return; }
+    DB.del(p[0], p[1]).catch(fail);
+  });
+  function renderAll() { renderMoney(); renderFit(); badges(); renderToday(); renderStats(); renderHead(); renderBrief(); renderCal(); renderMail(); renderPosta(); renderBlocks(); renderTasks(); renderPosts(); renderAreas(); renderNotes(); }
 
   /* ---------- colori ---------- */
   function buildColors() {
@@ -517,7 +628,7 @@
 
   /* ---------- accesso ---------- */
   function setErr(m) { $("auth-err").textContent = m || ""; }
-  function showAuth() { $("app").hidden = true; $("auth").hidden = false; $("login-email").value = CFG.owner; }
+  function showAuth() { $("tabbar").hidden = true; $("app").hidden = true; $("auth").hidden = false; $("login-email").value = CFG.owner; }
   $("loginform").addEventListener("submit", async function (e) {
     e.preventDefault(); setErr("");
     var r = await sb.auth.signInWithPassword({ email: $("login-email").value.trim(), password: $("login-pass").value });
@@ -546,7 +657,7 @@
   function arrived() { clearTimeout(timer); $("note").hidden = true; }
   function dbError() { clearTimeout(timer); $("note").textContent = "I dati non sono raggiungibili in questo momento. Controlla la connessione."; $("note").hidden = false; }
   function start() {
-    $("auth").hidden = true; $("app").hidden = false; setErr("");
+    $("auth").hidden = true; $("app").hidden = false; $("tabbar").hidden = false; setErr("");
     if (S.ready) return;
     S.ready = true;
     timer = setTimeout(function () { $("note").textContent = "I dati non sono ancora arrivati. Se compaiono, potrebbero non essere aggiornati."; $("note").hidden = false; }, 10000);
@@ -555,6 +666,8 @@
     DB.watch("posts", function () { S.posts = snapList("posts"); renderPosts(); });
     DB.watch("events", function () { S.events = snapList("events"); renderCal(); renderStats(); });
     DB.watch("blocks", function () { S.blocks = snapList("blocks"); renderBlocks(); renderCal(); renderStats(); });
+    DB.watch("spese", function () { S.spese = snapList("spese"); renderMoney(); });
+    DB.watch("allenamenti", function () { S.fit = snapList("allenamenti"); renderFit(); });
     DB.watch("notes", function () { S.notes = snapList("notes"); renderNotes(); });
     DB.watch("posta", function () { S.postaState = coll("posta").has("_stato") ? coll("posta").get("_stato") : null; S.posta = snapList("posta"); renderPosta(); });
     DB.watch("gcal", function () { S.gcal = coll("gcal").get("feed") || null; renderCal(); renderStats(); });
@@ -566,6 +679,6 @@
   buildChips(); buildColors(); renderAll();
   setInterval(renderHead, 60000);
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(function () {});
-  if (location.hash === "#posta") { try { $("posta-card").scrollIntoView(); } catch (e) {} }
+  document.body.classList.add("has-tabs"); (function () { var t = tabFromHash(); setTab(t[0], t[1]); })();
   sb.auth.getSession().then(function (r) { if (r.data && r.data.session) start(); else showAuth(); });
 })();

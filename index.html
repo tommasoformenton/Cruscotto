@@ -206,7 +206,7 @@
 </main>
 
 <div class="wrap" id="app" hidden>
-  <header class="top">
+  <header class="top" data-keep="oggi">
     <svg class="cob-art" viewBox="0 0 200 280" aria-hidden="true"><use href="#cob"/></svg>
     <div>
       <p class="eyebrow" id="week">Settimana</p>
@@ -228,7 +228,18 @@
   <div class="note" id="note" hidden></div>
   <nav class="chips" id="chips" aria-label="Filtra per area"></nav>
 
-  <section class="card voice" aria-labelledby="h-voice">
+  <section class="card today" data-tab="oggi" aria-labelledby="h-today">
+    <svg class="wm" viewBox="0 0 200 280" aria-hidden="true"><use href="#cob"/></svg>
+    <header><h2 id="h-today">Oggi</h2><span class="count" id="c-today"></span></header>
+    <p class="t-summary" id="t-summary" hidden></p>
+    <div class="today-grid">
+      <div><h3>Agenda</h3><ul class="t-list agenda" id="t-agenda"></ul></div>
+      <div><h3>Da fare entro domani</h3><ul class="t-list" id="t-tasks"></ul></div>
+      <div><h3>Email da rispondere</h3><ul class="t-list" id="t-mail"></ul></div>
+    </div>
+  </section>
+
+  <section class="card voice" data-tab="oggi" aria-labelledby="h-voice">
     <header><h2 id="h-voice">Appunti per Claude</h2><span class="count" id="voice-state"></span></header>
     <textarea id="voice-text" rows="3" placeholder="Impegni, scadenze, compiti, idee per post. Claude li legge al prossimo aggiornamento." aria-label="Appunto"></textarea>
     <div class="voice-actions">
@@ -239,12 +250,12 @@
     <ul class="notes" id="notes"></ul>
   </section>
 
-  <section class="card hero" aria-labelledby="h-brief">
+  <section class="card hero" data-tab="oggi" aria-labelledby="h-brief">
     <div><header><h2 id="h-brief">In breve</h2></header><p class="lead" id="summary"></p></div>
     <div><header><h2>Priorità</h2></header><ol class="prios" id="prios"></ol></div>
   </section>
 
-  <section class="card" aria-labelledby="h-cal">
+  <section class="card" data-tab="agenda" aria-labelledby="h-cal">
     <header>
       <h2 id="h-cal">Calendario</h2>
       <div class="head-r"><span class="count" id="c-cal"></span><button type="button" class="btn primary" data-new="event">Nuovo impegno</button></div>
@@ -270,13 +281,13 @@
     </details>
   </section>
 
-  <section class="card" aria-labelledby="h-blocks">
+  <section class="card" data-tab="agenda" aria-labelledby="h-blocks">
     <header><h2 id="h-blocks">Blocchi di lavoro proposti</h2><span class="count" id="c-blocks"></span></header>
     <div class="blocks" id="blocks"></div>
   </section>
 
   <div class="grid">
-    <section class="card" aria-labelledby="h-tasks">
+    <section class="card" data-tab="compiti" aria-labelledby="h-tasks">
       <header><h2 id="h-tasks">Compiti</h2><span class="count" id="c-tasks"></span></header>
       <ul class="tasks" id="tasks"></ul>
       <details class="done-list" id="donewrap" hidden><summary id="donesum"></summary><ul class="tasks" id="done"></ul></details>
@@ -286,19 +297,19 @@
         <button class="btn primary" type="submit">Aggiungi</button>
       </form>
     </section>
-    <section class="card" aria-labelledby="h-mail">
+    <section class="card" data-tab="posta" aria-labelledby="h-mail">
       <header><h2 id="h-mail">Email da gestire</h2><span class="count" id="c-mail"></span></header>
       <div id="mail"></div>
     </section>
   </div>
 
-  <section class="card posta" id="posta-card" aria-labelledby="h-posta">
+  <section class="card posta" data-tab="posta" id="posta-card" aria-labelledby="h-posta">
     <header><h2 id="h-posta">Posta Thunderbird</h2><span class="count" id="c-posta"></span></header>
     <p class="sub" id="posta-state"></p>
     <div class="pm-list" id="posta"></div>
   </section>
 
-  <section class="card" aria-labelledby="h-li">
+  <section class="card" data-tab="linkedin" aria-labelledby="h-li">
     <header>
       <h2 id="h-li">LinkedIn · piano e bozze</h2>
       <div class="head-r"><span class="count" id="c-li"></span><button type="button" class="btn primary" data-new="post">Nuovo post</button></div>
@@ -306,12 +317,37 @@
     <div class="posts" id="posts"></div>
   </section>
 
-  <section class="card" aria-labelledby="h-areas">
+  <section class="card money" data-tab="aree" aria-labelledby="h-money">
+    <header><h2 id="h-money">Spese</h2><span class="count" id="c-money"></span></header>
+    <form class="qform" id="money-form">
+      <input type="number" id="m-amount" inputmode="decimal" step="0.01" min="0" placeholder="Importo €" aria-label="Importo in euro" required>
+      <select id="m-cat" aria-label="Categoria"><option>Spesa</option><option>Casa</option><option>Trasporti</option><option>Lavoro</option><option>Svago</option><option>Salute</option><option>Altro</option></select>
+      <input type="text" id="m-note" placeholder="Nota (facoltativa)" aria-label="Nota">
+      <button type="submit" class="btn primary">Aggiungi</button>
+    </form>
+    <div class="bars" id="m-bars"></div>
+    <ul class="rows" id="m-list"></ul>
+  </section>
+
+  <section class="card fit" data-tab="aree" aria-labelledby="h-fit">
+    <header><h2 id="h-fit">Allenamenti</h2><span class="count" id="c-fit"></span></header>
+    <form class="qform" id="fit-form">
+      <select id="f-sport" aria-label="Sport"><option>Corsa</option><option>Camminata</option><option>Bici</option><option>Nuoto</option><option>Palestra</option><option>Altro</option></select>
+      <input type="number" id="f-min" inputmode="numeric" min="1" placeholder="Minuti" aria-label="Minuti" required>
+      <input type="number" id="f-km" inputmode="decimal" step="0.1" min="0" placeholder="Km (facolt.)" aria-label="Chilometri">
+      <input type="text" id="f-note" placeholder="Nota (facoltativa)" aria-label="Nota">
+      <button type="submit" class="btn primary">Aggiungi</button>
+    </form>
+    <div class="fit-stats" id="f-stats"></div>
+    <ul class="rows" id="f-list"></ul>
+  </section>
+
+  <section class="card" data-tab="aree" aria-labelledby="h-areas">
     <header><h2 id="h-areas">Stato delle aree</h2></header>
     <ul class="areas" id="areas"></ul>
   </section>
 
-  <details class="card" id="colors">
+  <details class="card" id="colors" data-tab="aree">
     <summary class="card-sum"><h2>Colori delle aree</h2></summary>
     <div class="colors-wrap" id="colorrows"></div>
     <div class="colors-foot">
@@ -320,8 +356,18 @@
     </div>
   </details>
 
-  <p class="runs">Aggiornamenti automatici ogni giorno alle 06:42, 14:37 e 17:44. Posta Thunderbird alle 12:00 e alle 18:00 (ora di Roma).</p>
+  <p class="runs" data-tab="aree">Aggiornamenti automatici ogni giorno alle 06:42, 14:37 e 17:44. Posta Thunderbird alle 12:00 e alle 18:00 (ora di Roma).</p>
 </div>
+
+
+<nav class="tabbar" id="tabbar" aria-label="Sezioni" hidden>
+  <button type="button" data-go="oggi" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M18.7 5.3l-2.1 2.1M7.4 16.6l-2.1 2.1"/></svg><span>Oggi</span></button>
+  <button type="button" data-go="agenda"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg><span>Agenda</span></button>
+  <button type="button" data-go="compiti"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M8.5 12.5l2.6 2.6 4.6-5.2"/></svg><span>Compiti</span><i class="bdg" id="bd-task" hidden></i></button>
+  <button type="button" data-go="posta"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5.5" width="18" height="13" rx="3"/><path d="M3.5 7.5l8.5 6 8.5-6"/></svg><span>Posta</span><i class="bdg" id="bd-mail" hidden></i></button>
+  <button type="button" data-go="linkedin"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V9M4 5.2v.1M9 20V9m0 4.5c0-2.5 1.8-4.5 4.3-4.5S17.5 10.600 17.500 13V20"/></svg><span>LinkedIn</span></button>
+  <button type="button" data-go="aree"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/></svg><span>Altro</span></button>
+</nav>
 
 <dialog id="dlg" aria-labelledby="dlg-title">
   <form id="dform">
