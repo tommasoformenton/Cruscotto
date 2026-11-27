@@ -197,7 +197,7 @@
     $("mail").innerHTML = html;
   }
   function taskHtml(t) {
-    return '<li class="task' + (t.done ? " done" : "") + '"><input type="checkbox" id="t-' + esc(t.id) + '" data-task="' + esc(t.id) + '"' + (t.done ? " checked" : "") + '><label for="t-' + esc(t.id) + '">' + esc(t.title) +
+    return '<li class="task' + (t.done ? " done" : "") + '"><input type="checkbox" id="t-' + esc(t.id) + '" data-task="' + esc(t.id) + '"' + (t.done ? " checked" : "") + '><label for="t-' + esc(t.id) + '">' + esc(t.title) + (t.repeat ? ' <span class="sub">↻ ' + ({ daily: "ogni giorno", weekly: "ogni settimana", monthly: "ogni mese" }[t.repeat] || "") + "</span>" : "") +
       '<span class="row-meta" style="margin:4px 0 0">' + areaTag(t.area) + (t.due ? '<span class="sub">entro ' + esc(dayLabel(t.due, false)) + "</span>" : "") + (t.source === "agente" ? '<span class="tag plain">proposto</span>' : "") + "</span></label>" +
       '<button type="button" class="lnk" data-edit="task|' + esc(t.id) + '">Modifica</button></li>';
   }
@@ -383,6 +383,16 @@
     if (d.getAttribute("data-armed") !== "1") { d.setAttribute("data-armed", "1"); d.textContent = "Conferma"; setTimeout(function () { d.setAttribute("data-armed", "0"); d.textContent = "Elimina"; }, 3000); return; }
     DB.del(p[0], p[1]).catch(fail);
   });
+  function nextDue(due, rep) {
+    var base = validDate(due) ? due : todayKey(), n = base, i = 0, today = todayKey();
+    do {
+      if (rep === "daily") n = addDays(n, 1);
+      else if (rep === "weekly") n = addDays(n, 7);
+      else { var p = n.split("-").map(Number), d = new Date(Date.UTC(p[0], p[1], 1)); var last = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate(); n = d.getUTCFullYear() + "-" + pad(d.getUTCMonth() + 1) + "-" + pad(Math.min(p[2], last)); }
+      i++;
+    } while (n <= today && i < 400);
+    return n;
+  }
   function renderAll() { renderMoney(); renderFit(); badges(); renderToday(); renderStats(); renderHead(); renderBrief(); renderCal(); renderMail(); renderPosta(); renderBlocks(); renderTasks(); renderPosts(); renderAreas(); renderNotes(); renderExtra(); }
 
   /* ---------- colori ---------- */
@@ -515,7 +525,15 @@
   document.addEventListener("toggle", function (e) { var d = e.target; if (d && d.getAttribute && d.getAttribute("data-post")) S.open[d.getAttribute("data-post")] = d.open; }, true);
   document.addEventListener("change", function (e) {
     var t = e.target, id = t && t.getAttribute && t.getAttribute("data-task");
-    if (id) { DB.update("tasks", id, { done: t.checked, doneAt: t.checked ? new Date().toISOString() : null }).catch(function () { renderTasks(); fail(); }); return; }
+    if (id) {
+      var cur = coll("tasks").get(id) || {};
+      DB.update("tasks", id, { done: t.checked, doneAt: t.checked ? new Date().toISOString() : null, repeat: t.checked ? null : (cur.repeat || cur.wasRepeat || null), wasRepeat: t.checked && cur.repeat ? cur.repeat : null }).catch(function () { renderTasks(); fail(); });
+      if (t.checked && cur.repeat) {
+        var nx = nextDue(cur.due, cur.repeat);
+        DB.add("tasks", { title: cur.title, area: cur.area, done: false, source: cur.source || "tu", due: nx, repeat: cur.repeat, reminder: cur.reminder === true, createdAt: new Date().toISOString() }).then(function () { toast("Prossimo compito: " + dayLabel(nx, false)); }).catch(fail);
+      }
+      return;
+    }
     var k = t && t.getAttribute && t.getAttribute("data-col");
     if (k) { var c = Object.assign({}, S.colors); c[k] = t.value; S.colors = c; DB.set("settings", "colors", c).catch(fail); }
   });
@@ -525,7 +543,8 @@
     e.preventDefault();
     var title = $("newtask").value.trim();
     if (!title) return;
-    DB.add("tasks", { title: title, area: $("newarea").value, done: false, source: "tu", due: null, createdAt: new Date().toISOString() }).then(function () { $("newtask").value = ""; }, fail);
+    var rp = $("newrepeat").value || null;
+    DB.add("tasks", { title: title, area: $("newarea").value, done: false, source: "tu", due: rp ? todayKey() : null, repeat: rp, createdAt: new Date().toISOString() }).then(function () { $("newtask").value = ""; }, fail);
   });
   $("dform").addEventListener("submit", function (e) { e.preventDefault(); saveEdit(); });
   $("dcancel").addEventListener("click", closeDlg);
@@ -685,6 +704,7 @@
     DB.watch("posta", function () { S.postaState = coll("posta").has("_stato") ? coll("posta").get("_stato") : null; S.posta = snapList("posta"); renderPosta(); });
     DB.watch("gcal", function () { S.gcal = coll("gcal").get("feed") || null; renderCal(); renderStats(); renderExtra(); });
     callSync("status").then(function (j) { S.gsync.calendars = j.calendars; renderCalStatus(); if (j.calendars) syncCalendar(true); }).catch(function () {});
+    DB.watch("settings", function () { S.nf = Object.assign({ ev: true, dg: true, tk: true, pre: true, wk: true, hour: 7 }, coll("settings").get("notifiche") || {}); renderNf(); });
     DB.watch("settings", function () { S.colors = Object.assign({}, coll("settings").get("colors") || {}); applyColors(); });
     if (pushSupported()) refreshPushBtn();
   }
@@ -781,6 +801,19 @@
   function renderSearchIf() { if ($("q") && $("q").value.trim().length >= 2) renderSearch(); }
   $("q").addEventListener("input", renderSearch);
 
+  function renderNf() {
+    var n = S.nf || { ev: true, dg: true, tk: true, pre: true, wk: true, hour: 7 };
+    Array.prototype.forEach.call(document.querySelectorAll("[data-nf]"), function (el) { el.checked = n[el.getAttribute("data-nf")] !== false; });
+    $("nf-hour").value = String(n.hour || 7);
+    $("nf-hour").disabled = n.dg === false;
+  }
+  function saveNf() {
+    var n = { hour: Number($("nf-hour").value) || 7 };
+    Array.prototype.forEach.call(document.querySelectorAll("[data-nf]"), function (el) { n[el.getAttribute("data-nf")] = el.checked; });
+    S.nf = n; renderNf();
+    DB.set("settings", "notifiche", n).then(function () { toast("Preferenze salvate."); }).catch(fail);
+  }
+  $("nf").addEventListener("change", saveNf);
   /* azioni */
   $("lw-prev").addEventListener("click", function () { S.liWeek--; renderLiCal(); });
   $("lw-next").addEventListener("click", function () { S.liWeek++; renderLiCal(); });
@@ -825,7 +858,15 @@
   S.weekStart = weekMonday(todayKey());
   buildChips(); buildColors(); renderAll();
   setInterval(renderHead, 60000);
-  if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(function () {});
+  if ("serviceWorker" in navigator) {
+    var hadCtl = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.addEventListener("controllerchange", function () { if (hadCtl) $("upd").hidden = false; hadCtl = true; });
+    navigator.serviceWorker.register("sw.js").then(function (reg) {
+      document.addEventListener("visibilitychange", function () { if (!document.hidden) reg.update().catch(function () {}); });
+      setInterval(function () { reg.update().catch(function () {}); }, 30 * 60 * 1000);
+    }).catch(function () {});
+    $("upd").addEventListener("click", function () { location.reload(); });
+  }
   document.body.classList.add("has-tabs"); (function () { var t = tabFromHash(); setTab(t[0], t[1]); })();
   var started = false;
   function go() { if (!started) { started = true; start(); } }
