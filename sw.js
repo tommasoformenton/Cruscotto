@@ -1,4 +1,4 @@
-const CACHE = "cruscotto-v1";
+const CACHE = "cruscotto-v2";
 const SHELL = ["./", "index.html", "style.css", "app.js", "config.js", "supabase.js", "manifest.webmanifest", "icon-192.png"];
 
 self.addEventListener("install", (e) => {

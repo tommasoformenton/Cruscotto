@@ -4,7 +4,7 @@
   var sb = window.supabase.createClient(CFG.url, CFG.anon, { auth: { persistSession: true, autoRefreshToken: true } });
   var TZ = "Europe/Rome";
   var AREAS = { maunsell: "Maunsell", medoacus: "Medoacus", linkedin: "LinkedIn", scuola: "Scuola", vita: "Vita" };
-  var DEFAULTS = { maunsell: "#2563EB", medoacus: "#BE123C", linkedin: "#16A34A", scuola: "#7C3AED", vita: "#D97706" };
+  var DEFAULTS = { maunsell: "#2F6FB5", medoacus: "#B8344A", linkedin: "#0E8C8C", scuola: "#7B5EA7", vita: "#D9822B" };
   var STATUS = { idea: "Idea", bozza: "Bozza", pubblicato: "Pubblicato" };
   var NEXT_STATUS = { idea: "bozza", bozza: "pubblicato", pubblicato: "bozza" };
   var NEXT_LABEL = { idea: "Segna come bozza", bozza: "Segna come pubblicato", pubblicato: "Rimetti in bozza" };
