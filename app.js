@@ -590,11 +590,12 @@
   });
   $("voice-clear").addEventListener("click", function () { $("voice-text").value = ""; $("voice-text").focus(); });
   var SR = window.SpeechRecognition || window.webkitSpeechRecognition, rec = null;
-  if (SR) {
-    var mic = $("voice-mic"); mic.hidden = false;
+  var mic = $("voice-mic"); mic.hidden = false;
+  {
     mic.addEventListener("click", function () {
+      if (!SR) { $("voice-text").focus(); toast("Tocca il microfono sulla tastiera del telefono per dettare."); return; }
       if (rec) { rec.stop(); return; }
-      rec = new SR(); rec.lang = "it-IT"; rec.interimResults = false; rec.continuous = false;
+      rec = new SR(); rec.lang = "it-IT"; rec.interimResults = false; rec.continuous = true;
       rec.onresult = function (ev) {
         var t = "", i; for (i = ev.resultIndex; i < ev.results.length; i++) t += ev.results[i][0].transcript;
         var ta = $("voice-text"); ta.value = ta.value ? ta.value + " " + t.trim() : t.trim();
