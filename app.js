@@ -860,12 +860,12 @@
   setInterval(renderHead, 60000);
   if ("serviceWorker" in navigator) {
     var hadCtl = !!navigator.serviceWorker.controller;
-    navigator.serviceWorker.addEventListener("controllerchange", function () { if (hadCtl) $("upd").hidden = false; hadCtl = true; });
+    navigator.serviceWorker.addEventListener("controllerchange", function () { if (hadCtl) $("newver").hidden = false; hadCtl = true; });
     navigator.serviceWorker.register("sw.js").then(function (reg) {
       document.addEventListener("visibilitychange", function () { if (!document.hidden) reg.update().catch(function () {}); });
       setInterval(function () { reg.update().catch(function () {}); }, 30 * 60 * 1000);
     }).catch(function () {});
-    $("upd").addEventListener("click", function () { location.reload(); });
+    $("newver").addEventListener("click", function () { location.reload(); });
   }
   document.body.classList.add("has-tabs"); (function () { var t = tabFromHash(); setTab(t[0], t[1]); })();
   var started = false;
