@@ -1,8 +1,8 @@
-const CACHE = "cruscotto-v8";
+const CACHE = "cruscotto-v9";
 const SHELL = ["./", "index.html", "style.css", "app.js", "config.js", "supabase.js", "manifest.webmanifest", "icon-192.png"];
 
 self.addEventListener("install", (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL.map(function (u) { return new Request(u, { cache: "reload" }); }))).then(() => self.skipWaiting()));
 });
 
 self.addEventListener("activate", (e) => {
@@ -16,7 +16,7 @@ self.addEventListener("fetch", (e) => {
   const req = e.request;
   if (req.method !== "GET" || new URL(req.url).origin !== location.origin) return;
   e.respondWith(
-    fetch(req)
+    fetch(req, { cache: "reload" })
       .then((res) => {
         const copy = res.clone();
         caches.open(CACHE).then((c) => c.put(req, copy));
